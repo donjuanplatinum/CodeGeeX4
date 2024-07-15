@@ -99,7 +99,7 @@ impl TextGeneration {
             println!("raw generate token {}", next_token);
             let token = self.tokenizer.decode(&[next_token], true).expect("Token error");
             self.prompts.push(token.clone()); // Store the generated token
-            println!("[sample:{token}]");
+            println!("[token:{token}]");
             std::io::stdout().flush().unwrap();
         }
         let dt = start_gen.elapsed();
@@ -109,9 +109,9 @@ impl TextGeneration {
         );
 
         // Output all stored prompts
-        println!("\nall sample:");
-        for all_sample in &self.prompts {
-            print!("{all_sample}");
+        println!("\nAll token:");
+        for all_token in &self.prompts {
+            print!("{all_token}");
         }
         Ok(())
     }
