@@ -232,6 +232,6 @@ fn main() -> Result<(), ()> {
         args.verbose_prompt,
         &device,
     );
-    pipeline.run(&args.prompt, 5)?;
+    pipeline.run(&args.prompt, args.sample_len)?;
     Ok(())
 }
