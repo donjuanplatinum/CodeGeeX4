@@ -1,7 +1,6 @@
-//use anyhow::{Error as E, Result};
+// use anyhow::{Error as E, Result};
 use clap::Parser;
 use codegeex4_candle::codegeex4::*;
-
 
 use candle_core::{DType, Device, Tensor};
 use candle_core as candle;
@@ -18,6 +17,7 @@ struct TextGeneration {
     repeat_penalty: f32,
     repeat_last_n: usize,
     verbose_prompt: bool,
+    prompts: Vec<String>, // Add this line
 }
 
 impl TextGeneration {
@@ -42,14 +42,15 @@ impl TextGeneration {
             repeat_last_n,
             verbose_prompt,
             device: device.clone(),
+            prompts: Vec::new(), // Initialize the prompts vector
         }
     }
 
-    fn run(&mut self, prompt: &str, sample_len: usize) -> Result<(),()> {
+    fn run(&mut self, prompt: &str, sample_len: usize) -> Result<(), ()> {
         use std::io::Write;
         println!("starting the inference loop");
         let tokens = self.tokenizer.encode(prompt, true).expect("tokens error");
-	println!("run starting the token 57");
+        println!("run starting the token 57");
         if tokens.is_empty() {
             panic!("Empty prompts are not supported in the chatglm model.")
         }
@@ -62,16 +63,17 @@ impl TextGeneration {
         let mut tokens = tokens.get_ids().to_vec();
         let mut generated_tokens = 0usize;
         let eos_token = 151329;
-        
-        print!("{prompt}");
+
+        self.prompts.push(prompt.to_string()); // Store the prompt
+        println!("[User:{prompt}]");
         std::io::stdout().flush().expect("output flush error");
         let start_gen = std::time::Instant::now();
-	println!("start_gen");
-	println!("samplelen {}",sample_len);
-	let mut count = 0;
+        println!("start_gen");
+        println!("samplelen {}", sample_len);
+        let mut count = 0;
         for index in 0..sample_len {
-	    count += 1;
-	    println!("sample count {}",count);
+            count += 1;
+            println!(" sample count {}", count);
             let context_size = if index > 0 { 1 } else { tokens.len() };
             let ctxt = &tokens[tokens.len().saturating_sub(context_size)..];
             let input = Tensor::new(ctxt, &self.device).unwrap().unsqueeze(0).expect("create tensor input error");
@@ -94,9 +96,10 @@ impl TextGeneration {
             if next_token == eos_token {
                 break;
             }
-	    println!("raw generate token {}",next_token);
+            println!("raw generate token {}", next_token);
             let token = self.tokenizer.decode(&[next_token], true).expect("Token error");
-            print!("{token}");
+            self.prompts.push(token.clone()); // Store the generated token
+            println!("[sample:{token}]");
             std::io::stdout().flush().unwrap();
         }
         let dt = start_gen.elapsed();
@@ -104,6 +107,12 @@ impl TextGeneration {
             "\n{generated_tokens} tokens generated ({:.2} token/s)",
             generated_tokens as f64 / dt.as_secs_f64(),
         );
+
+        // Output all stored prompts
+        println!("\nall sample:");
+        for all_sample in &self.prompts {
+            print!("{all_sample}");
+        }
         Ok(())
     }
 }
@@ -112,9 +121,9 @@ impl TextGeneration {
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Run on CPU rather than on GPU.
-    #[arg(name="cache",short,long, default_value=".")]
+    #[arg(name = "cache", short, long, default_value = ".")]
     cache_path: String,
-    
+
     #[arg(long)]
     cpu: bool,
 
@@ -162,8 +171,7 @@ struct Args {
     repeat_last_n: usize,
 }
 
-fn main() -> Result<(),()> {
-    
+fn main() -> Result<(), ()> {
     let args = Args::parse();
     println!(
         "avx: {}, neon: {}, simd128: {}, f16c: {}",
@@ -180,9 +188,9 @@ fn main() -> Result<(),()> {
     );
 
     let start = std::time::Instant::now();
-    println!("cache path {}",args.cache_path);
+    println!("cache path {}", args.cache_path);
     let api = hf_hub::api::sync::ApiBuilder::from_cache(hf_hub::Cache::new(args.cache_path.into())).build().unwrap();
-    
+
     let model_id = match args.model_id {
         Some(model_id) => model_id.to_string(),
         None => "THUDM/codegeex4-all-9b".to_string(),
@@ -224,6 +232,6 @@ fn main() -> Result<(),()> {
         args.verbose_prompt,
         &device,
     );
-    pipeline.run(&args.prompt, args.sample_len)?;
+    pipeline.run(&args.prompt, 5)?;
     Ok(())
 }
