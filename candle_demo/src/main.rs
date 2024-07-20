@@ -4,9 +4,9 @@ extern crate intel_mkl_src;
 #[cfg(feature = "accelerate")]
 extern crate accelerate_src;
 
-use owo_colors;
 use clap::Parser;
 use codegeex4_candle::codegeex4::*;
+use owo_colors::{self, OwoColorize};
 
 use candle_core as candle;
 use candle_core::{DType, Device, Tensor};
@@ -74,12 +74,11 @@ impl TextGeneration {
         let mut tokens = tokens.get_ids().to_vec();
         let mut generated_tokens = 0usize;
 
-        print!("{prompt}");
         std::io::stdout().flush().expect("output flush error");
         let start_gen = std::time::Instant::now();
 
         println!("\n 开始生成");
-        println!("samplelen {}", sample_len);
+        println!("samplelen {}", sample_len.blue());
         let mut count = 0;
         let mut result = vec![];
         for index in 0..sample_len {
@@ -116,7 +115,7 @@ impl TextGeneration {
                 .tokenizer
                 .decode(&[next_token], true)
                 .expect("Token error");
-            println!("[token:{token}]");
+            println!("[token:{}]", token.blue());
             result.push(token);
             std::io::stdout().flush().unwrap();
         }
@@ -191,24 +190,32 @@ fn main() -> Result<(), ()> {
     let args = Args::parse();
     println!(
         "avx: {}, neon: {}, simd128: {}, f16c: {}",
-        candle::utils::with_avx(),
-        candle::utils::with_neon(),
-        candle::utils::with_simd128(),
-        candle::utils::with_f16c()
+        candle::utils::with_avx().red(),
+        candle::utils::with_neon().red(),
+        candle::utils::with_simd128().red(),
+        candle::utils::with_f16c().red(),
     );
     println!(
         "temp: {:.2} repeat-penalty: {:.2} repeat-last-n: {}",
-        args.temperature.unwrap_or(0.95),
-        args.repeat_penalty,
-        args.repeat_last_n
+        args.temperature.unwrap_or(0.95).red(),
+        args.repeat_penalty.red(),
+        args.repeat_last_n.red(),
     );
 
-    println!("cache path {}", args.cache_path);
+    println!("cache path {}", args.cache_path.blue());
+    println!("Prompt: [{}]", args.prompt.green());
+    let mut seed: u64 = 0;
+    if let Some(_seed) = args.seed {
+        seed = _seed;
+    } else {
+        let mut rng = rand::thread_rng();
+        seed = rng.gen();
+    }
+    println!("Using Seed {}", seed.red());
     let api = hf_hub::api::sync::ApiBuilder::from_cache(hf_hub::Cache::new(args.cache_path.into()))
         .build()
         .unwrap();
-    let mut rng = rand::thread_rng();
-    let seed: u64 = rng.gen();
+
     let model_id = match args.model_id {
         Some(model_id) => model_id.to_string(),
         None => "THUDM/codegeex4-all-9b".to_string(),
@@ -240,11 +247,11 @@ fn main() -> Result<(), ()> {
     } else {
         DType::F32
     };
-    println!("dtype is {:?}", dtype);
+    println!("DType is {:?}", dtype.yellow());
     let vb = unsafe { VarBuilder::from_mmaped_safetensors(&filenames, dtype, &device).unwrap() };
     let model = Model::new(&config, vb).unwrap();
 
-    println!("模型加载完毕 {:?}", start.elapsed().as_secs());
+    println!("模型加载完毕 {:?}", start.elapsed().as_secs().green());
 
     let mut pipeline = TextGeneration::new(
         model,
