@@ -4,8 +4,8 @@ extern crate intel_mkl_src;
 #[cfg(feature = "accelerate")]
 extern crate accelerate_src;
 
-use std::io::BufReader;
 use std::io::BufRead;
+use std::io::BufReader;
 
 use clap::Parser;
 use codegeex4_candle::codegeex4::*;
@@ -59,7 +59,7 @@ impl TextGeneration {
 
     fn run(&mut self, prompt: &str, sample_len: usize) -> Result<(), ()> {
         use std::io::Write;
-	println!("prompt:[{}]",prompt.green());
+        println!("prompt:[{}]", prompt.green());
         println!("开始任务");
         let tokens = self.tokenizer.encode(prompt, true).expect("tokens error");
         if tokens.is_empty() {
@@ -149,7 +149,6 @@ struct Args {
     /// Display the token for the specified prompt.
     #[arg(long, default_value_t = true)]
     verbose_prompt: bool,
-
 
     /// The temperature used to generate samples.
     #[arg(long)]
@@ -252,30 +251,29 @@ fn main() -> Result<(), ()> {
     let vb = unsafe { VarBuilder::from_mmaped_safetensors(&filenames, dtype, &device).unwrap() };
     let model = Model::new(&config, vb).unwrap();
 
-    println!("模型加载完毕 {:?}", start.elapsed().as_secs().green());
-
-    let mut pipeline = TextGeneration::new(
-        model,
-        tokenizer,
-        seed,
-        args.temperature,
-        args.top_p,
-        args.repeat_penalty,
-        args.repeat_last_n,
-        args.verbose_prompt,
-        &device,
-        dtype,
-    );
+    println!("模型加载完毕  {:?}s", start.elapsed().as_secs().green());
 
     let stdin = std::io::stdin();
     let reader = BufReader::new(stdin);
     for line in reader.lines() {
-	println!("{}",format!("请输入Prompt").blue());
-	let line = line.unwrap();
-	if line.is_empty() {
-	    continue;
-	}
-	pipeline.run(&line,args.sample_len)?;
+        println!("{}", format!("请输入Prompt").blue());
+        let line = line.unwrap();
+        if line.is_empty() {
+            continue;
+        }
+        let mut pipeline = TextGeneration::new(
+            model,
+            tokenizer,
+            seed,
+            args.temperature,
+            args.top_p,
+            args.repeat_penalty,
+            args.repeat_last_n,
+            args.verbose_prompt,
+            &device,
+            dtype,
+        );
+        pipeline.run(&line, args.sample_len)?;
     }
     Ok(())
 }
