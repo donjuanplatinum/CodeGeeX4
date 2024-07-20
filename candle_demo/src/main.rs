@@ -270,6 +270,7 @@ fn main() -> Result<(), ()> {
     let stdin = std::io::stdin();
     let reader = BufReader::new(stdin);
     for line in reader.lines() {
+	println!("{}",format!("请输入Prompt").blue());
 	let line = line.unwrap();
 	if line.is_empty() {
 	    continue;
