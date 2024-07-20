@@ -19,10 +19,10 @@ use hf_hub::{Repo, RepoType};
 use rand::Rng;
 use tokenizers::Tokenizer;
 
-struct TextGeneration {
-    model: Model,
+struct TextGeneration<'a> {
+    model: &'a mut Model,
     device: Device,
-    tokenizer: Tokenizer,
+    tokenizer: &'a Tokenizer,
     logits_processor: LogitsProcessor,
     repeat_penalty: f32,
     repeat_last_n: usize,
@@ -30,11 +30,11 @@ struct TextGeneration {
     dtype: DType,
 }
 
-impl TextGeneration {
+impl<'a> TextGeneration<'a> {
     #[allow(clippy::too_many_arguments)]
     fn new(
-        model: Model,
-        tokenizer: Tokenizer,
+        model: &'a mut Model,
+        tokenizer: &'a Tokenizer,
         seed: u64,
         temp: Option<f64>,
         top_p: Option<f64>,
@@ -249,7 +249,7 @@ fn main() -> Result<(), ()> {
     };
     println!("DType is {:?}", dtype.yellow());
     let vb = unsafe { VarBuilder::from_mmaped_safetensors(&filenames, dtype, &device).unwrap() };
-    let model = Model::new(&config, vb).unwrap();
+    let mut model = Model::new(&config, vb).unwrap();
 
     println!("模型加载完毕  {:?}s", start.elapsed().as_secs().green());
 
@@ -262,8 +262,8 @@ fn main() -> Result<(), ()> {
             continue;
         }
         let mut pipeline = TextGeneration::new(
-            model,
-            tokenizer,
+            &mut model,
+            &tokenizer,
             seed,
             args.temperature,
             args.top_p,
