@@ -4,6 +4,7 @@ extern crate intel_mkl_src;
 #[cfg(feature = "accelerate")]
 extern crate accelerate_src;
 
+use owo_colors;
 use clap::Parser;
 use codegeex4_candle::codegeex4::*;
 
@@ -12,6 +13,7 @@ use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::generation::LogitsProcessor;
 use hf_hub::{Repo, RepoType};
+use rand::Rng;
 use tokenizers::Tokenizer;
 
 struct TextGeneration {
@@ -142,7 +144,7 @@ struct Args {
     cpu: bool,
 
     /// Display the token for the specified prompt.
-    #[arg(long,default_value_t=true)]
+    #[arg(long, default_value_t = true)]
     verbose_prompt: bool,
 
     #[arg(long)]
@@ -157,8 +159,8 @@ struct Args {
     top_p: Option<f64>,
 
     /// The seed to use when generating random samples.
-    #[arg(long, default_value_t = 299792458)]
-    seed: u64,
+    #[arg(long)]
+    seed: Option<u64>,
 
     /// The length of the sample to generate (in tokens).
     #[arg(long, short = 'n', default_value_t = 5000)]
@@ -205,7 +207,8 @@ fn main() -> Result<(), ()> {
     let api = hf_hub::api::sync::ApiBuilder::from_cache(hf_hub::Cache::new(args.cache_path.into()))
         .build()
         .unwrap();
-
+    let mut rng = rand::thread_rng();
+    let seed: u64 = rng.gen();
     let model_id = match args.model_id {
         Some(model_id) => model_id.to_string(),
         None => "THUDM/codegeex4-all-9b".to_string(),
@@ -246,7 +249,7 @@ fn main() -> Result<(), ()> {
     let mut pipeline = TextGeneration::new(
         model,
         tokenizer,
-        args.seed,
+        seed,
         args.temperature,
         args.top_p,
         args.repeat_penalty,
