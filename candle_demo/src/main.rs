@@ -4,6 +4,9 @@ extern crate intel_mkl_src;
 #[cfg(feature = "accelerate")]
 extern crate accelerate_src;
 
+use std::io::BufReader;
+use std::io::BufRead;
+
 use clap::Parser;
 use codegeex4_candle::codegeex4::*;
 use owo_colors::{self, OwoColorize};
@@ -56,7 +59,8 @@ impl TextGeneration {
 
     fn run(&mut self, prompt: &str, sample_len: usize) -> Result<(), ()> {
         use std::io::Write;
-        println!("starting the inference loop");
+	println!("prompt:[{}]",prompt.green());
+        println!("开始任务");
         let tokens = self.tokenizer.encode(prompt, true).expect("tokens error");
         if tokens.is_empty() {
             panic!("Empty prompts are not supported in the chatglm model.")
@@ -146,8 +150,6 @@ struct Args {
     #[arg(long, default_value_t = true)]
     verbose_prompt: bool,
 
-    #[arg(long)]
-    prompt: String,
 
     /// The temperature used to generate samples.
     #[arg(long)]
@@ -203,7 +205,6 @@ fn main() -> Result<(), ()> {
     );
 
     println!("cache path {}", args.cache_path.blue());
-    println!("Prompt: [{}]", args.prompt.green());
     let mut seed: u64 = 0;
     if let Some(_seed) = args.seed {
         seed = _seed;
@@ -265,6 +266,15 @@ fn main() -> Result<(), ()> {
         &device,
         dtype,
     );
-    pipeline.run(&args.prompt, args.sample_len)?;
+
+    let stdin = std::io::stdin();
+    let reader = BufReader::new(stdin);
+    for line in reader.lines() {
+	let line = line.unwrap();
+	if line.is_empty() {
+	    continue;
+	}
+	pipeline.run(&line,args.sample_len)?;
+    }
     Ok(())
 }
