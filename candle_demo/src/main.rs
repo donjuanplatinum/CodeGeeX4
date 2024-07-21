@@ -7,6 +7,8 @@ extern crate accelerate_src;
 use clap::Parser;
 use codegeex4_candle::codegeex4::*;
 use owo_colors::{self, OwoColorize};
+use std::io::BufRead;
+use std::io::BufReader;
 
 use candle_core as candle;
 use candle_core::{DType, Device, Tensor};
@@ -54,80 +56,89 @@ impl TextGeneration {
         }
     }
 
-    fn run(&mut self, prompt: &str, sample_len: usize) -> Result<(), ()> {
+    fn run(&mut self, sample_len: usize) -> Result<(), ()> {
         use std::io::Write;
+
         println!("starting the inference loop");
-        let tokens = self.tokenizer.encode(prompt, true).expect("tokens error");
-        if tokens.is_empty() {
-            panic!("Empty prompts are not supported in the chatglm model.")
-        }
-        if self.verbose_prompt {
-            for (token, id) in tokens.get_tokens().iter().zip(tokens.get_ids().iter()) {
-                let token = token.replace('▁', " ").replace("<0x0A>", "\n");
-                println!("{id:7} -> '{token}'");
+
+        let stdin = std::io::stdin();
+        let reader = BufReader::new(stdin);
+        for line in reader.lines() {
+            let line = line.expect("Failed to read line");
+            let tokens = self.tokenizer.encode(line, true).expect("tokens error");
+            if tokens.is_empty() {
+                panic!("Empty prompts are not supported in the chatglm model.")
             }
-        }
-        let eos_token = match self.tokenizer.get_vocab(true).get("<|endoftext|>") {
-            Some(token) => *token,
-            None => panic!("cannot find the endoftext token"),
-        };
-        let mut tokens = tokens.get_ids().to_vec();
-        let mut generated_tokens = 0usize;
-
-        std::io::stdout().flush().expect("output flush error");
-        let start_gen = std::time::Instant::now();
-
-        println!("\n 开始生成");
-        println!("samplelen {}", sample_len.blue());
-        let mut count = 0;
-        let mut result = vec![];
-        for index in 0..sample_len {
-            count += 1;
-            println!("sample count {}", count);
-            let context_size = if index > 0 { 1 } else { tokens.len() };
-            let ctxt = &tokens[tokens.len().saturating_sub(context_size)..];
-            let input = Tensor::new(ctxt, &self.device)
-                .unwrap()
-                .unsqueeze(0)
-                .expect("create tensor input error");
-            let logits = self.model.forward(&input).unwrap();
-            let logits = logits.squeeze(0).unwrap().to_dtype(self.dtype).unwrap();
-            let logits = if self.repeat_penalty == 1. {
-                logits
-            } else {
-                let start_at = tokens.len().saturating_sub(self.repeat_last_n);
-                candle_transformers::utils::apply_repeat_penalty(
-                    &logits,
-                    self.repeat_penalty,
-                    &tokens[start_at..],
-                )
-                .unwrap()
+            if self.verbose_prompt {
+                for (token, id) in tokens.get_tokens().iter().zip(tokens.get_ids().iter()) {
+                    let token = token.replace('▁', " ").replace("<0x0A>", "\n");
+                    println!("{id:7} -> '{token}'");
+                }
+            }
+            let eos_token = match self.tokenizer.get_vocab(true).get("<|endoftext|>") {
+                Some(token) => *token,
+                None => panic!("cannot find the endoftext token"),
             };
+            let mut tokens = tokens.get_ids().to_vec();
+            let mut generated_tokens = 0usize;
 
-            let next_token = self.logits_processor.sample(&logits).unwrap();
-            tokens.push(next_token);
-            generated_tokens += 1;
-            if next_token == eos_token {
-                break;
+            std::io::stdout().flush().expect("output flush error");
+            let start_gen = std::time::Instant::now();
+
+            println!("\n 开始生成");
+            println!("samplelen {}", sample_len.blue());
+            let mut count = 0;
+            let mut result = vec![];
+
+            for index in 0..sample_len {
+                count += 1;
+                println!("sample count {}", count);
+                let context_size = if index > 0 { 1 } else { tokens.len() };
+                let ctxt = &tokens[tokens.len().saturating_sub(context_size)..];
+                let input = Tensor::new(ctxt, &self.device)
+                    .unwrap()
+                    .unsqueeze(0)
+                    .expect("create tensor input error");
+                let logits = self.model.forward(&input).unwrap();
+                let logits = logits.squeeze(0).unwrap().to_dtype(self.dtype).unwrap();
+                let logits = if self.repeat_penalty == 1. {
+                    logits
+                } else {
+                    let start_at = tokens.len().saturating_sub(self.repeat_last_n);
+                    candle_transformers::utils::apply_repeat_penalty(
+                        &logits,
+                        self.repeat_penalty,
+                        &tokens[start_at..],
+                    )
+                    .unwrap()
+                };
+
+                let next_token = self.logits_processor.sample(&logits).unwrap();
+                tokens.push(next_token);
+                generated_tokens += 1;
+                if next_token == eos_token {
+                    break;
+                }
+                println!("raw generate token {}", next_token);
+                let token = self
+                    .tokenizer
+                    .decode(&[next_token], true)
+                    .expect("Token error");
+                println!("[token:{}]", token.blue());
+                result.push(token);
+                std::io::stdout().flush().unwrap();
             }
-            println!("raw generate token {}", next_token);
-            let token = self
-                .tokenizer
-                .decode(&[next_token], true)
-                .expect("Token error");
-            println!("[token:{}]", token.blue());
-            result.push(token);
-            std::io::stdout().flush().unwrap();
+            let dt = start_gen.elapsed();
+            println!(
+                "\n{generated_tokens} tokens generated ({:.2} token/s)",
+                generated_tokens as f64 / dt.as_secs_f64(),
+            );
+            println!("Result:");
+            for tokens in result {
+                print!("{tokens}");
+            }
         }
-        let dt = start_gen.elapsed();
-        println!(
-            "\n{generated_tokens} tokens generated ({:.2} token/s)",
-            generated_tokens as f64 / dt.as_secs_f64(),
-        );
-        println!("Result:");
-        for tokens in result {
-            print!("{tokens}");
-        }
+
         Ok(())
     }
 }
@@ -265,6 +276,6 @@ fn main() -> Result<(), ()> {
         &device,
         dtype,
     );
-    pipeline.run(&args.prompt, args.sample_len)?;
+    pipeline.run(args.sample_len)?;
     Ok(())
 }
