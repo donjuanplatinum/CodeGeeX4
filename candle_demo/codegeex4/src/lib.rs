@@ -48,7 +48,88 @@ impl TextGeneration {
         }
     }
 
-    pub fn run(&mut self, sample_len: usize) -> Result<(), ()> {
+    pub async fn run(&mut self, prompt: &str, sample_len: usize) -> Result<String, ()> {
+        use std::io::Write;
+        let tokens = self.tokenizer.encode(prompt, true).expect("tokens error");
+        if tokens.is_empty() {
+            panic!("Empty prompts are not supported in the chatglm model.")
+        }
+        if self.verbose_prompt {
+            for (token, id) in tokens.get_tokens().iter().zip(tokens.get_ids().iter()) {
+                let token = token.replace('▁', " ").replace("<0x0A>", "\n");
+                println!("{id:7} -> '{token}'");
+            }
+        }
+        let eos_token = match self.tokenizer.get_vocab(true).get("<|endoftext|>") {
+            Some(token) => *token,
+            None => panic!("cannot find the endoftext token"),
+        };
+        let mut tokens = tokens.get_ids().to_vec();
+        let mut generated_tokens = 0usize;
+
+        std::io::stdout().flush().expect("output flush error");
+        let start_gen = std::time::Instant::now();
+
+        //            println!("\n 开始生成");
+        println!("samplelen {}", sample_len.blue());
+        let mut result = String::new();
+
+        for index in 0..sample_len {
+            let context_size = if index > 0 { 1 } else { tokens.len() };
+            let ctxt = &tokens[tokens.len().saturating_sub(context_size)..];
+            let input = Tensor::new(ctxt, &self.device)
+                .unwrap()
+                .unsqueeze(0)
+                .expect("create tensor input error");
+            let logits = self.model.forward(&input).unwrap();
+            let logits = logits.squeeze(0).unwrap().to_dtype(self.dtype).unwrap();
+            let logits = if self.repeat_penalty == 1. {
+                logits
+            } else {
+                let start_at = tokens.len().saturating_sub(self.repeat_last_n);
+                candle_transformers::utils::apply_repeat_penalty(
+                    &logits,
+                    self.repeat_penalty,
+                    &tokens[start_at..],
+                )
+                .unwrap()
+            };
+
+            let next_token = self.logits_processor.sample(&logits).unwrap();
+            tokens.push(next_token);
+            generated_tokens += 1;
+            if next_token == eos_token {
+                break;
+            }
+            let token = self
+                .tokenizer
+                .decode(&[next_token], true)
+                .expect("Token error");
+            if self.verbose_prompt {
+                println!(
+                    "[Index: {}] [Raw Token: {}] [Decode Token: {}]",
+                    index.blue(),
+                    next_token.green(),
+                    token.yellow()
+                );
+            }
+            result.push_str(&token);
+            std::io::stdout().flush().unwrap();
+        }
+        let dt = start_gen.elapsed();
+        println!(
+            "\n{generated_tokens} tokens generated ({:.2} token/s)",
+            generated_tokens as f64 / dt.as_secs_f64(),
+        );
+        if self.verbose_prompt {
+            println!("Result:");
+            println!("{result}");
+        }
+        self.model.reset_kv_cache(); // 清理模型kv
+        return Ok(result);
+    }
+
+ pub fn sync_run(&mut self, sample_len: usize) -> Result<(), ()> {
         use std::io::Write;
 
         println!("[欢迎使用Codegeex4,请输入prompt]");

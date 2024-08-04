@@ -63,7 +63,7 @@ pub struct ChatCompletionResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum FinishResaon{
+pub enum FinishResaon {
     STOP,
     LENGTH,
 }
@@ -100,19 +100,24 @@ impl ChatCompletionResponseChoice {
 
 impl ChatCompletionRequest {
     pub fn empty() -> Self {
-	Self{
-	    model: "codegeex4".to_string(),
-	    messages: vec!(ChatMessage {
+        Self {
+            model: "codegeex4".to_string(),
+            messages: vec![ChatMessage {
                 role: "assistant".to_string(),
                 content: "".to_string(),
-            }),
-	    temperature: 0.2_f64,
-	    top_p: 0.2_f64,
-	    max_tokens: 1024_usize,
-	    stop: vec!("<|user|>".to_string(), "<|assistant|>".to_string(), "<|observation|>".to_string(), "<|endoftext|>".to_string()),
-	    stream: true,
-	    presence_penalty: None,
-	}
+            }],
+            temperature: 0.2_f64,
+            top_p: 0.2_f64,
+            max_tokens: 1024_usize,
+            stop: vec![
+                "<|user|>".to_string(),
+                "<|assistant|>".to_string(),
+                "<|observation|>".to_string(),
+                "<|endoftext|>".to_string(),
+            ],
+            stream: true,
+            presence_penalty: None,
+        }
     }
 }
 

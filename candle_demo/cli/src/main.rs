@@ -33,6 +33,7 @@ fn main() -> Result<(), ()> {
     );
 
     println!("cache path {}", args.cache_path.blue());
+
     let mut seed: u64 = 0;
     if let Some(_seed) = args.seed {
         seed = _seed;
@@ -94,6 +95,6 @@ fn main() -> Result<(), ()> {
         &device,
         dtype,
     );
-    pipeline.run(args.sample_len)?;
+    pipeline.sync_run(args.sample_len)?;
     Ok(())
 }
