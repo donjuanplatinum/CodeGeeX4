@@ -95,7 +95,7 @@ async fn main() {
     println!("模型加载完毕 {:?}", start.elapsed().as_secs().green());
 
     //let server = server::Server::new(args.clone(),pipeline);
-    let mut pipeline = TextGeneration::new(
+    let  pipeline = TextGeneration::new(
         model,
         tokenizer,
         seed,
@@ -107,7 +107,7 @@ async fn main() {
         &device,
         dtype,
     );
-    let mut pipeline = Arc::new(Mutex::new(pipeline));
+    let  pipeline = Arc::new(Mutex::new(pipeline));
     let server = server::Server::new(args.clone(), pipeline);
 
     println!(

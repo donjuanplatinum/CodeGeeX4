@@ -13,14 +13,42 @@ pub struct ChatMessage {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChatCompletionRequest {
+    #[serde(default = "default_model")]
     pub model: String,
+    #[serde(default)]
     pub messages: Vec<ChatMessage>,
+    #[serde(default = "default_temperature")]
     pub temperature: f64,
+    #[serde(default = "default_top_p")]
     pub top_p: f64,
+    #[serde(default = "default_max_tokens")]
     pub max_tokens: usize,
+    #[serde(default)]
     pub stop: Vec<String>,
+    #[serde(default = "default_stream")]
     pub stream: bool,
+    #[serde(default)]
     pub presence_penalty: Option<f32>,
+}
+
+fn default_model() -> String {
+    "THUDM/codegeex4-all-9b".to_string()
+}
+
+fn default_temperature() -> f64 {
+    0.2
+}
+
+fn default_top_p() -> f64 {
+    0.2
+}
+
+fn default_max_tokens() -> usize {
+    1024
+}
+
+fn default_stream() -> bool {
+    false
 }
 
 #[derive(Debug, Serialize, Deserialize)]
