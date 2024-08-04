@@ -41,6 +41,7 @@ pub async fn codegeex4_completion(
     request: web::Json<ChatCompletionRequest>,
     pipeline: Data<Arc<Mutex<TextGeneration>>>,
 ) -> impl Responder {
+    println!("Get Request {:?}",request);
     let request = request.into_inner();
 
     if request.stream == false {

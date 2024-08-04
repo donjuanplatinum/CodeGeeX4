@@ -3,7 +3,6 @@ use actix_web::{
     web::{self, Data},
     HttpRequest, Responder,
 };
-use owo_colors::OwoColorize;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
